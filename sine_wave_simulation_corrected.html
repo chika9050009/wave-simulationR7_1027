@@ -1,0 +1,265 @@
+
+<!DOCTYPE html>
+
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<title>正弦波合成シミュレーション</title>
+<style>
+    body {
+      font-family: sans-serif;
+      margin: 10px;
+    }
+    canvas {
+      border: 1px solid #ccc;
+      background-color: #fff;
+    }
+    .container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+    }
+    .controls {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      flex: 1;
+      min-width: 300px;
+    }
+    .wave-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .wave-group {
+      flex: 1;
+      min-width: 250px;
+    }
+    label {
+      display: block;
+      font-size: 14px;
+    }
+    input[type="range"] {
+      width: 100%;
+    }
+    .checkbox-group {
+      display: flex;
+      gap: 10px;
+    }
+    .formula {
+      margin-top: 10px;
+      font-family: monospace;
+    }
+  </style>
+</head>
+<body><input id="amplitude2" step="0.1" type="number" value="1.0"/><input id="amplitude1" step="0.1" type="number" value="1.0"/>
+<h2>正弦波合成シミュレーション</h2>
+<div class="container">
+<canvas height="300" id="waveCanvas" width="600"></canvas>
+<div class="controls">
+<div class="wave-controls">
+<div class="wave-group">
+<h4>波1の設定</h4>
+<label>振幅 A1: <span id="a1Val">1</span> cm</label>
+<input id="a1" max="3" min="0" step="0.1" type="range" value="1"/>
+<label>周期 T1: <span id="t1Val">5</span> s</label>
+<input id="t1" max="10" min="1" step="0.1" type="range" value="5"/>
+<label>波長 λ1: <span id="l1Val">5</span> cm</label>
+<input id="l1" max="10" min="1" step="0.1" type="range" value="5"/>
+<label>初期位相 θ1: <span id="p1Val">0</span> rad</label>
+<input id="p1" max="6.28" min="0" step="0.1" type="range" value="0"/>
+<label>進行方向1:
+            <select id="dir1">
+<option value="right">右→</option>
+<option value="left">左←</option>
+</select>
+</label>
+</div>
+<div class="wave-group">
+<h4>波2の設定</h4>
+<label>振幅 A2: <span id="a2Val">1</span> cm</label>
+<input id="a2" max="3" min="0" step="0.1" type="range" value="1"/>
+<label>周期 T2: <span id="t2Val">5</span> s</label>
+<input id="t2" max="10" min="1" step="0.1" type="range" value="5"/>
+<label>波長 λ2: <span id="l2Val">5</span> cm</label>
+<input id="l2" max="10" min="1" step="0.1" type="range" value="5"/>
+<label>初期位相 θ2: <span id="p2Val">0</span> rad</label>
+<input id="p2" max="6.28" min="0" step="0.1" type="range" value="0"/>
+<label>進行方向2:
+            <select id="dir2">
+<option value="left">左←</option>
+<option value="right">右→</option>
+</select>
+</label>
+</div>
+</div>
+<label>アニメーション速度: <span id="speedVal">1</span></label>
+<input id="speed" max="5" min="0.1" step="0.1" type="range" value="1"/>
+<div class="checkbox-group">
+<label><input checked="" id="show1" type="checkbox"/> 波1</label>
+<label><input checked="" id="show2" type="checkbox"/> 波2</label>
+<label><input checked="" id="showSum" type="checkbox"/> 合成波</label>
+</div>
+<button id="play">▶再生</button>
+<button id="pause">⏸停止</button>
+<button id="reset">🔄リセット</button>
+<div class="formula">
+        y = A sin(2π(t/T ± x/λ) + θ)
+      </div>
+</div>
+</div>
+<script>
+    const canvas = document.getElementById("waveCanvas");
+    const ctx = canvas.getContext("2d");
+    const width = canvas.width;
+    const height = canvas.height;
+    const padding = 0.5;
+    const xMin = 0 - padding;
+    const xMax = 6 + padding;
+    const yMin = -3;
+    const yMax = 3;
+    const xScale = width / (xMax - xMin);
+    const yScale = height / (yMax - yMin);
+
+    let t = 0;
+    let playing = false;
+
+    function getVal(id) {
+      return parseFloat(document.getElementById(id).value);
+    }
+
+    function updateLabels() {
+      ["a1","t1","l1","p1","a2","t2","l2","p2","speed"].forEach(id => {
+        document.getElementById(id+"Val").textContent = getVal(id).toFixed(2);
+      });
+    }
+
+    function drawGrid() {
+      ctx.clearRect(0, 0, width, height);
+      ctx.strokeStyle = "#aaa";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      for (let x = Math.ceil(xMin); x <= Math.floor(xMax); x++) {
+        const px = (x - xMin) * xScale;
+        ctx.moveTo(px, 0);
+        ctx.lineTo(px, height);
+      }
+      for (let y = Math.ceil(yMin); y <= Math.floor(yMax); y++) {
+        const py = height - (y - yMin) * yScale;
+        ctx.moveTo(0, py);
+        ctx.lineTo(width, py);
+      }
+      ctx.stroke();
+
+      ctx.strokeStyle = "#000";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      const x0 = (0 - xMin) * xScale;
+      ctx.moveTo(x0, 0);
+      ctx.lineTo(x0, height);
+      const y0 = height - (0 - yMin) * yScale;
+      ctx.moveTo(0, y0);
+      ctx.lineTo(width, y0);
+      ctx.stroke();
+
+      ctx.fillStyle = "#000";
+      ctx.font = "12px sans-serif";
+      for (let x = Math.ceil(xMin); x <= Math.floor(xMax); x++) {
+        const px = (x - xMin) * xScale;
+        ctx.fillText(x.toString(), px + 2, y0 - 4);
+      }
+      for (let y = Math.ceil(yMin); y <= Math.floor(yMax); y++) {
+        const py = height - (y - yMin) * yScale;
+        ctx.fillText(y.toString(), x0 + 4, py - 2);
+      }
+    }
+
+    function waveY(A, T, L, theta, dir, x, t) {
+      const sign = dir === "right" ? -1 : 1;
+      return A * Math.sin(2 * Math.PI * (t / T + sign * x / L) + theta);
+    }
+
+    function drawWaves() {
+      drawGrid();
+      const A1 = getVal("a1"), T1 = getVal("t1"), L1 = getVal("l1"), theta1 = getVal("p1"), dir1 = document.getElementById("dir1").value;
+      const A2 = getVal("a2"), T2 = getVal("t2"), L2 = getVal("l2"), theta2 = getVal("p2"), dir2 = document.getElementById("dir2").value;
+      const show1 = document.getElementById("show1").checked;
+      const show2 = document.getElementById("show2").checked;
+      const showSum = document.getElementById("showSum").checked;
+
+      const phase1 = theta1 + 2 * Math.PI * (dir1 === "right" ? 1 : -1) * xMin / L1;
+      const phase2 = theta2 + 2 * Math.PI * (dir2 === "right" ? 1 : -1) * xMax / L2;
+
+      const points1 = [], points2 = [], pointsSum = [];
+      for (let px = 0; px < width; px++) {
+        const x = xMin + px / xScale;
+        const y1 = waveY(A1, T1, L1, phase1, dir1, x, t);
+        const y2 = waveY(A2, T2, L2, phase2, dir2, x, t);
+        points1.push([px, height - (y1 - yMin) * yScale]);
+        points2.push([px, height - (y2 - yMin) * yScale]);
+        pointsSum.push([px, height - (y1 + y2 - yMin) * yScale]);
+      }
+
+      if (show1) {
+        ctx.strokeStyle = "blue";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        points1.forEach(([x,y],i) => i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y));
+        ctx.stroke();
+      }
+      if (show2) {
+        ctx.strokeStyle = "green";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        points2.forEach(([x,y],i) => i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y));
+        ctx.stroke();
+      }
+      if (showSum) {
+        ctx.strokeStyle = "red";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        pointsSum.forEach(([x,y],i) => i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y));
+        ctx.stroke();
+      }
+    }
+
+    function animate() {
+      if (playing) {
+        t += 0.02 * getVal("speed");
+        drawWaves();
+        requestAnimationFrame(animate);
+      }
+    }
+
+    document.getElementById("play").onclick = () => {
+      if (!playing) {
+        playing = true;
+        animate();
+      }
+    };
+    document.getElementById("pause").onclick = () => {
+      playing = false;
+    };
+    document.getElementById("reset").onclick = () => {
+      ["a1","t1","l1","p1","a2","t2","l2","p2","speed"].forEach(id => {
+        document.getElementById(id).value = id === "speed" ? 1 : (id.includes("p") ? 0 : 5);
+      });
+      document.getElementById("dir1").value = "right";
+      document.getElementById("dir2").value = "left";
+      t = 0;
+      updateLabels();
+      drawWaves();
+    };
+
+    ["a1","t1","l1","p1","a2","t2","l2","p2","speed","dir1","dir2","show1","show2","showSum"].forEach(id => {
+      document.getElementById(id).oninput = () => {
+        updateLabels();
+        drawWaves();
+      };
+    });
+
+    updateLabels();
+    drawWaves();
+  </script>
+</body>
+</html>
